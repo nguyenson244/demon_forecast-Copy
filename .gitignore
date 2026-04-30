@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dữ liệu (Không nên upload lên Git nếu quá nặng)
+data/processed/
+data/features/
+# data/raw/  # Nếu file raw nhỏ thì có thể upload, nếu lớn thì nên ignore
+
+# Model binary (Nặng, không nên upload)
+models/*.pkl
+models/*.joblib
+
+# Kết quả (Tùy chọn, thường ignore để mỗi lần chạy repo mới sạch)
+results/figures/*.png
+results/metrics/*.csv
+
+# Logs
+logs/*.log
+*.log
+
+# Môi trường ảo
+venv/
+.env
+.vscode/
+.idea/

@@ -1,0 +1,56 @@
+# ============================================================
+# config.yaml — Hybrid Prophet-LightGBM Pipeline
+# Kinh Đô FMCG Demand Forecasting
+# ============================================================
+# Tập trung toàn bộ hằng số, đường dẫn, và tham số chia sẻ.
+# Chỉnh sửa file này — KHÔNG sửa code Python.
+# ============================================================
+
+# ── Đường dẫn thư mục (relative to project root) ──────────
+paths:
+  raw:        data/raw
+  processed:  data/processed
+  features:   data/features
+  models:     models
+  figures:    results/figures
+  metrics:    results/metrics
+  logs:       logs
+
+# ── Cột quan trọng ─────────────────────────────────────────
+columns:
+  date:    ACTUALSHIPDATE
+  target:  Total QTY
+
+# ── Mốc Train/Test Split ───────────────────────────────────
+split_date: "2025-06-30"
+
+# ── Ngày lễ Việt Nam ───────────────────────────────────────
+holidays:
+  tet:
+    2023: "2023-01-22"   # Quý Mão
+    2024: "2024-02-10"   # Giáp Thìn
+    2025: "2025-01-29"   # Ất Tỵ
+    2026: "2026-02-17"   # Bính Ngọ
+  mid_autumn:
+    2023: "2023-09-29"
+    2024: "2024-09-17"
+    2025: "2025-10-06"
+
+# ── Feature Engineering ────────────────────────────────────
+features:
+  lag_periods:        [1, 2, 3, 5, 7, 14, 21, 28, 30, 60, 90, 120, 150, 180, 365]
+  same_weekday_weeks: [1, 2, 3, 4]
+  rolling_windows:    [7, 14, 30, 90]
+  rolling_stats:      [mean, std, median, min, max]
+
+# ── LightGBM ───────────────────────────────────────────────
+lightgbm:
+  device:          gpu      # gpu | cpu  (auto-fallback nếu không có GPU)
+  optuna_n_trials: 50
+  tscv_n_splits:   5
+
+# ── API ────────────────────────────────────────────────────
+api:
+  host: 0.0.0.0
+  port: 8000
+  reload: false
