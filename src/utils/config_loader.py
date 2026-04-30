@@ -1,100 +1,96 @@
 """
-config_loader.py — YAML Config Loader
-============================================================
-Đọc config/config.yaml và expose các hằng số đã được type-annotate
-để các module khác import giống như config.py cũ — nhưng từ YAML.
-
-Usage
------
-    from src.utils.config_loader import cfg, PATHS, COLUMNS, HOLIDAYS
-
-    raw_dir    = PATHS["raw"]
-    date_col   = COLUMNS["date"]
-    tet_dates  = HOLIDAYS["tet"]
-============================================================
+config_loader.py — Centralized Config Object with Full Backward Compatibility
 """
-
-from __future__ import annotations
 
 import os
 from pathlib import Path
 from typing import Any
-
 import pandas as pd
 import yaml
 
-# ---------------------------------------------------------------------------
-# Resolve paths
-# ---------------------------------------------------------------------------
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]   # src/utils/ → project/
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CONFIG_PATH  = _PROJECT_ROOT / "config" / "config.yaml"
-
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+class Config:
+    def __init__(self):
+        self._cfg = _load_yaml(_CONFIG_PATH)
+        
+        # Paths
+        self.path_root      = str(_PROJECT_ROOT)
+        self.path_raw       = self._abs(self._cfg["paths"]["raw"])
+        self.path_processed = self._abs(self._cfg["paths"]["processed"])
+        self.path_features  = self._abs(self._cfg["paths"]["features"])
+        self.path_models    = self._abs(self._cfg["paths"]["models"])
+        self.path_figures   = self._abs(self._cfg["paths"]["figures"])
+        self.path_metrics   = self._abs(self._cfg["paths"]["metrics"])
+        self.path_logs      = self._abs(self._cfg["paths"]["logs"])
+        
+        # Backward compat for PATHS dict
+        self.PATHS = {
+            "raw": self.path_raw,
+            "processed": self.path_processed,
+            "features": self.path_features,
+            "models": self.path_models,
+            "figures": self.path_figures,
+            "metrics": self.path_metrics,
+            "logs": self.path_logs
+        }
+        
+        # Columns
+        self.col_date   = self._cfg["columns"]["date"]
+        self.col_brand  = self._cfg["columns"]["brand"]
+        self.col_cat    = self._cfg["columns"]["category"]
+        self.col_target = self._cfg["columns"]["target"]
+        
+        # Split
+        self.split_date = pd.Timestamp(self._cfg["split_date"])
+        
+        # Clustering
+        self.cluster_mapping = self._cfg.get("cluster_mapping", {})
+        
+        # Holidays
+        _hol = self._cfg.get("holidays", {})
+        self.tet_dates = {int(y): pd.Timestamp(d) for y, d in _hol.get("tet", {}).items()}
+        self.mid_autumn_dates = {int(y): pd.Timestamp(d) for y, d in _hol.get("mid_autumn", {}).items()}
+        self.holidays_dict = {"tet": self.tet_dates, "mid_autumn": self.mid_autumn_dates}
 
-# ---------------------------------------------------------------------------
-# Load once at import time
-# ---------------------------------------------------------------------------
-cfg: dict[str, Any] = _load_yaml(_CONFIG_PATH)
+        # Features
+        _fe = self._cfg.get("features", {})
+        self.lag_periods = _fe.get("lag_periods", [])
+        self.rolling_windows = _fe.get("rolling_windows", [])
+        self.rolling_stats = _fe.get("rolling_stats", [])
+        self.same_weekday_weeks = _fe.get("same_weekday_weeks", [])
 
-# ── Paths (absolute) ────────────────────────────────────────────────────────
-def _abs(rel: str) -> str:
-    return str(_PROJECT_ROOT / rel)
+        # LightGBM
+        self.lgbm_params = self._cfg.get("lightgbm", {}).get("params", {})
+        self.lgbm_optuna_trials = self._cfg.get("lightgbm", {}).get("optuna_n_trials", 50)
 
-PATHS: dict[str, str] = {k: _abs(v) for k, v in cfg["paths"].items()}
+    def _abs(self, rel_path: str) -> str:
+        return str(_PROJECT_ROOT / rel_path)
 
-# ── Column names ────────────────────────────────────────────────────────────
-COLUMNS: dict[str, str] = cfg["columns"]
-DATE_COL:   str = COLUMNS["date"]
-TARGET_COL: str = COLUMNS["target"]
+# Instance duy nhất
+CONF = Config()
 
-# ── Split date ───────────────────────────────────────────────────────────────
-SPLIT_DATE: pd.Timestamp = pd.Timestamp(cfg["split_date"])
+# --- EXPORTS CHO COMPATIBILITY ---
+PATHS = CONF.PATHS
+DATE_COL = CONF.col_date
+TARGET_COL = CONF.col_target
+SPLIT_DATE = CONF.split_date
 
-# ── Holidays ─────────────────────────────────────────────────────────────────
-_raw_holidays = cfg.get("holidays", {})
+TET_DATES = CONF.tet_dates
+MID_AUTUMN_DATES = CONF.mid_autumn_dates
+HOLIDAYS = CONF.holidays_dict
 
-TET_DATES: dict[int, pd.Timestamp] = {
-    int(yr): pd.Timestamp(dt)
-    for yr, dt in _raw_holidays.get("tet", {}).items()
-}
+LAG_PERIODS = CONF.lag_periods
+ROLLING_WINDOWS = CONF.rolling_windows
+ROLLING_STATS = CONF.rolling_stats
+SAME_WEEKDAY_WEEKS = CONF.same_weekday_weeks
 
-MID_AUTUMN_DATES: dict[int, pd.Timestamp] = {
-    int(yr): pd.Timestamp(dt)
-    for yr, dt in _raw_holidays.get("mid_autumn", {}).items()
-}
-
-HOLIDAYS: dict[str, dict] = {
-    "tet":        TET_DATES,
-    "mid_autumn": MID_AUTUMN_DATES,
-}
-
-# ── Feature engineering params ───────────────────────────────────────────────
-_fe = cfg.get("features", {})
-LAG_PERIODS:        list[int] = _fe.get("lag_periods", [])
-SAME_WEEKDAY_WEEKS: list[int] = _fe.get("same_weekday_weeks", [])
-ROLLING_WINDOWS:    list[int] = _fe.get("rolling_windows", [])
-ROLLING_STATS:      list[str] = _fe.get("rolling_stats", [])
-
-# ── LightGBM params ──────────────────────────────────────────────────────────
-_lgb             = cfg.get("lightgbm", {})
-LIGHTGBM_DEVICE: str = _lgb.get("device", "cpu")
-OPTUNA_N_TRIALS: int = _lgb.get("optuna_n_trials", 50)
-TSCV_N_SPLITS:   int = _lgb.get("tscv_n_splits", 5)
-
-# ── API params ───────────────────────────────────────────────────────────────
-_api      = cfg.get("api", {})
-API_HOST: str = _api.get("host", "0.0.0.0")
-API_PORT: int = _api.get("port", 8000)
-
-
-# ---------------------------------------------------------------------------
-# Helper: ensure all output directories exist
-# ---------------------------------------------------------------------------
-def ensure_dirs() -> None:
-    """Create all output directories if they don't exist."""
-    for key in ["processed", "features", "models", "figures", "metrics", "logs"]:
-        os.makedirs(PATHS[key], exist_ok=True)
+def ensure_dirs():
+    for p in [CONF.path_processed, CONF.path_features, CONF.path_models, 
+              CONF.path_figures, CONF.path_metrics, CONF.path_logs]:
+        os.makedirs(p, exist_ok=True)

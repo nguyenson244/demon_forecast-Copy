@@ -16,10 +16,33 @@ paths:
   metrics:    results/metrics
   logs:       logs
 
+# ── Cấu hình Phân cụm (Clustering) ────────────────────────
+# Cluster 0: Stable (Bán mạnh, đều)
+# Cluster 1: Regular/Snacks (Biến động vừa)
+# Cluster 2: Extreme Seasonal (Mùa vụ Trung Thu/Tết)
+cluster_mapping:
+  KINH DO BREAD: 0
+  KINH DO CAKE: 0
+  SOLITE: 0
+  COSY: 0
+  AFC: 1
+  OREO: 1
+  LU: 1
+  RITZ: 1
+  SLIDE: 1
+  KINH DO BISCUIT: 1
+  THU: 2
+  TRANG VANG: 2
+  HAMPER: 2
+  CADBURY: 2
+  KOKO: 2
+
 # ── Cột quan trọng ─────────────────────────────────────────
 columns:
-  date:    ACTUALSHIPDATE
-  target:  Total QTY
+  date:     ACTUALSHIPDATE
+  brand:    BRAND
+  category: CATEGORY
+  target:   Total QTY
 
 # ── Mốc Train/Test Split ───────────────────────────────────
 split_date: "2025-06-30"

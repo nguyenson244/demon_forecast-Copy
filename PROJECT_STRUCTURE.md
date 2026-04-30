@@ -1,144 +1,88 @@
-# 📁 Project Structure — Hybrid Prophet-LightGBM Demand Forecasting
+# Cấu Trúc Dự Án (Project Structure) — Phiên Bản Modular
 
-> **Dự án:** Dự báo nhu cầu sản phẩm FMCG (Kinh Đô) sử dụng mô hình lai Prophet + LightGBM  
-> **Mục tiêu:** Pipeline tự động 5 bước từ dữ liệu thô → dự báo → đánh giá kết quả
+> **Dự án:** Dự báo nhu cầu sản phẩm FMCG (Kinh Đô) sử dụng mô hình lai Prophet + LightGBM
+> **Kiến trúc:** Feature-based Package Layout (Sạch - Chuyên nghiệp - Dễ mở rộng)
 
 ---
 
-## 🗂️ Cây Thư Mục
+## 🗂️ Cây Thư Mục Hoàn Chỉnh
 
-```
+```text
 deman_forecast/
 │
-├── 📄 run_pipeline.py              # Điểm vào chính — chạy toàn bộ 5 bước tuần tự
-├── 📄 requirements.txt             # Danh sách thư viện phụ thuộc
-├── 📄 structure.md                 # Ghi chú cấu trúc thư mục (bản gốc)
-├── 📄 PROJECT_STRUCTURE.md         # Tài liệu cấu trúc dự án (file này)
+├── 📄 run_pipeline.py              # Điểm vào chính — Chạy toàn bộ Pipeline 5 bước
+├── 📄 README.md                    # Hướng dẫn cài đặt và vận hành nhanh
+├── 📄 TECHNICAL_DOCUMENTATION.md   # Giải thích ý tưởng thiết kế và nội dung chi tiết
+├── 📄 PROJECT_STRUCTURE.md         # Tài liệu cấu trúc thư mục (file này)
+├── 📄 requirements.txt             # Danh sách thư viện (Pandas, Prophet, LightGBM, FastAPI...)
+├── 📄 .gitignore                   # Ngăn chặn upload file rác/nặng lên GitHub
 │
-├── 📁 data/                        # Toàn bộ dữ liệu theo từng giai đoạn xử lý
-│   ├── 📁 raw/                     # ⚠️ Dữ liệu thô gốc — KHÔNG BAO GIỜ SỬA
-│   │   ├── data_2023.csv           # Dữ liệu bán hàng năm 2023
-│   │   ├── data_2024.csv           # Dữ liệu bán hàng năm 2024
-│   │   └── data_2025.csv           # Dữ liệu bán hàng năm 2025
+├── 📁 config/                      # Quản lý cấu hình tập trung
+│   └── config.yaml                 # Chứa tham số ngày lễ, mốc lag, config model
+│
+├── 📁 data/                        # Quản lý dữ liệu đa tầng
+│   ├── 📁 raw/                     # Dữ liệu gốc (2023, 2024, 2025)
+│   ├── 📁 processed/               # Dữ liệu sau khi làm sạch (cleaned_data.csv)
+│   └── 📁 features/                # Dữ liệu sau khi tạo 80+ đặc trưng (train/test_features.csv)
+│
+├── 📁 src/                         # Mã nguồn cốt lõi (Source Code)
+│   ├── 📁 api/                     # Triển khai Web Service
+│   │   └── app.py                  # API FastAPI (Dự báo thời gian thực)
 │   │
-│   ├── 📁 processed/               # Dữ liệu đã làm sạch và xử lý outliers
-│   │   └── cleaned_data.csv        # Output của Bước 1 (data_prep.py)
+│   ├── 📁 data/                    # Xử lý dữ liệu
+│   │   ├── data_loader.py          # Đọc và gộp file CSV thô
+│   │   ├── data_cleaning.py        # Tiền xử lý, xử lý zero-inflation
+│   │   └── data_validation.py      # Kiểm tra chất lượng và logic dữ liệu
 │   │
-│   └── 📁 features/                # Dữ liệu đã feature engineering, sẵn sàng train
-│       ├── full_features.csv       # Toàn bộ dataset sau khi tạo features
-│       ├── train_features.csv      # Tập huấn luyện (Stage 1 - Prophet)
-│       ├── test_features.csv       # Tập kiểm tra (Stage 1 - Prophet)
-│       ├── train_with_residuals.csv # Tập train kèm Residuals từ Prophet
-│       └── test_with_residuals.csv  # Tập test kèm Residuals từ Prophet
+│   ├── 📁 features/                # Đặc trưng hóa
+│   │   └── feature_engineering.py  # Tạo Lags, Rolling windows, đặc trưng Ngày lễ
+│   │
+│   ├── 📁 models/                  # Huấn luyện mô hình
+│   │   ├── prophet_model.py        # Stage 1: Prophet per Brand
+│   │   ├── lightgbm_model.py       # Stage 2: LightGBM Global (Residuals)
+│   │   └── train.py                # Entry point cho việc huấn luyện
+│   │
+│   ├── 📁 evaluation/              # Đánh giá & Kiểm định
+│   │   ├── metrics.py              # Tính RMSE, MAPE và vẽ biểu đồ kết quả
+│   │   └── backtesting.py          # Đánh giá chéo chuỗi thời gian (Walk-forward)
+│   │
+│   ├── 📁 pipeline/                # Điều phối (Orchestration)
+│   │   └── pipeline.py             # Script điều khiển luồng công việc 5 bước
+│   │
+│   └── 📁 utils/                   # Công cụ hỗ trợ (Helpers)
+│       ├── logger.py               # Ghi nhật ký hệ thống tập trung
+│       └── config_loader.py        # Đọc file YAML và expose hằng số
 │
-├── 📁 src/                         # Mã nguồn Python cho từng bước pipeline
-│   ├── __init__.py                 # Khai báo package Python
-│   ├── config.py                   # Cấu hình trung tâm (đường dẫn, tham số, hyperparameters)
-│   ├── data_prep.py                # [Bước 1] Tiền xử lý, làm sạch, xử lý Outliers
-│   ├── feature_eng.py              # [Bước 2] Tạo đặc trưng: lag, rolling window, ngày lễ
-│   ├── model_prophet.py            # [Bước 3] Huấn luyện Prophet theo từng Brand + trích Residuals
-│   ├── model_lightgbm.py           # [Bước 4] Huấn luyện LightGBM Global trên Residuals
-│   └── evaluation.py               # [Bước 5] Tính RMSE/MAPE/sMAPE + vẽ biểu đồ
+├── 📁 models/                      # Lưu trữ các Model đã huấn luyện (.pkl)
+│   ├── prophet_models.pkl          # File model Prophet cho các Brand
+│   └── lightgbm_global.pkl         # File model LightGBM toàn cục
 │
-├── 📁 models_saved/                # Lưu trữ mô hình đã huấn luyện (dùng lại không cần train lại)
-│   ├── prophet_models.pkl          # Các mô hình Prophet (per Brand) đã lưu (~1.5 MB)
-│   ├── lightgbm_global.pkl         # Mô hình LightGBM Global đã lưu (~2 MB)
-│   └── lightgbm_best_params.pkl    # Hyperparameters tốt nhất của LightGBM
+├── 📁 results/                     # Đầu ra của hệ thống
+│   ├── 📁 figures/                 # Biểu đồ Forecast vs Actual, Feature Importance
+│   └── 📁 metrics/                 # Bảng so sánh độ lỗi, Backtest summary
 │
-├── 📁 notebooks/                   # Jupyter Notebooks để EDA và thử nghiệm
-│   └── EDA.ipynb                   # Phân tích khám phá dữ liệu (Exploratory Data Analysis)
+├── 📁 logs/                        # Nhật ký thực thi
+│   └── pipeline.log                # Lưu vết lịch sử chạy của toàn bộ hệ thống
 │
-└── 📁 results/                     # Kết quả đầu ra sau khi chạy pipeline
-    ├── 📁 figures/                  # Biểu đồ hình ảnh (Forecast vs Actual, Residual plots)
-    └── 📁 metrics/                  # Bảng số liệu độ chính xác (.csv: RMSE, MAPE, sMAPE)
+└── 📁 notebooks/                   # Môi trường nghiên cứu (R&D)
+    └── EDA.ipynb                   # Phân tích dữ liệu khám phá (Dùng cho báo cáo)
 ```
 
 ---
 
-## ⚙️ Luồng Pipeline 5 Bước
+## 🏗️ Quy Trình Dữ Liệu (Data Flow)
 
-```
-data/raw/          data/processed/    data/features/     models_saved/      results/
-[data_2023~25]  →  [cleaned_data]  →  [train/test]    →  [prophet.pkl    →  [figures/]
-                                      [residuals]         lightgbm.pkl]     [metrics/]
-     │                  │                  │                   │                 │
-  [Bước 1]           [Bước 2]          [Bước 3]           [Bước 4]          [Bước 5]
-  data_prep       feature_eng       model_prophet      model_lightgbm      evaluation
-```
-
-| Bước | File            | Mô tả                                              | Input                  | Output                       |
-|------|-----------------|-----------------------------------------------------|------------------------|------------------------------|
-| 1    | `data_prep.py`  | Làm sạch, merge 3 năm, xử lý outliers/missing      | `data/raw/*.csv`       | `data/processed/cleaned_data.csv` |
-| 2    | `feature_eng.py`| Tạo lag, rolling mean/std, đặc trưng thời gian, lễ | `cleaned_data.csv`     | `data/features/full_features.csv` |
-| 3    | `model_prophet.py` | Train Prophet/Brand, trích Residuals             | `train/test_features`  | `*_with_residuals.csv`, `prophet_models.pkl` |
-| 4    | `model_lightgbm.py` | Train LightGBM Global trên Residuals           | `*_with_residuals.csv` | `lightgbm_global.pkl`        |
-| 5    | `evaluation.py` | Tính metric, vẽ biểu đồ so sánh                   | Model + test data      | `results/figures/`, `results/metrics/` |
+1.  **Bước 1 (Loading & Cleaning)**: Dữ liệu thô từ `data/raw/` được gộp lại, xử lý giá trị âm, điền khuyết các ngày không bán được hàng thành 0. Lưu vào `data/processed/`.
+2.  **Bước 2 (Feature Engineering)**: Tạo ra 80+ cột dữ liệu mới dựa trên lịch sử và ngày lễ. Chia thành tập Train/Test theo thời gian. Lưu vào `data/features/`.
+3.  **Bước 3 (Stage 1 - Prophet)**: Huấn luyện Prophet cho từng Brand để học xu hướng dài hạn. Trích xuất sai số (Residuals) để làm mục tiêu cho bước sau.
+4.  **Bước 4 (Stage 2 - LightGBM)**: Huấn luyện 1 model LightGBM duy nhất trên toàn bộ dữ liệu để học cách sửa lỗi cho Prophet. Tìm tham số tốt nhất qua Optuna.
+5.  **Bước 5 (Evaluation)**: Tính toán sai số cuối cùng, vẽ biểu đồ so sánh thực tế và dự báo. Lưu vào `results/`.
 
 ---
 
-## 🚀 Cách Chạy Pipeline
+## 📌 Ghi Chú Cho Lập Trình Viên
 
-```bash
-# Chạy toàn bộ 5 bước từ đầu
-python run_pipeline.py
-
-# Chạy từ bước cụ thể (ví dụ: bỏ qua bước 1-2, chạy từ bước 3)
-python run_pipeline.py --step 3
-```
-
----
-
-## 📦 Thư Viện Chính (`requirements.txt`)
-
-| Thư viện       | Mục đích                                          |
-|----------------|---------------------------------------------------|
-| `pandas`       | Xử lý và thao tác dữ liệu dạng bảng              |
-| `numpy`        | Tính toán số học, mảng đa chiều                   |
-| `prophet`      | Mô hình dự báo chuỗi thời gian (Stage 1)          |
-| `lightgbm`     | Mô hình Gradient Boosting tốc độ cao (Stage 2)    |
-| `scikit-learn` | Preprocessing, cross-validation, metrics          |
-| `matplotlib`   | Vẽ biểu đồ trực quan hóa kết quả                  |
-| `seaborn`      | Biểu đồ thống kê nâng cao                         |
-| `joblib`       | Lưu và tải lại các mô hình (.pkl)                 |
-
----
-
-## 🏗️ Kiến Trúc Mô Hình Lai (Hybrid Architecture)
-
-```
-            ┌──────────────────────────────────────┐
-            │         Dữ liệu Đầu Vào              │
-            │   (Sales per Brand per Date)          │
-            └──────────────────┬───────────────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │   Feature Engineering │
-                    │ (Lag, Rolling, Holiday)│
-                    └──────────┬───────────┘
-                               │
-               ┌───────────────▼────────────────┐
-               │       Stage 1: PROPHET          │
-               │    (Huấn luyện theo từng Brand) │
-               │   → Dự báo xu hướng & mùa vụ   │
-               └───────────────┬────────────────┘
-                               │
-               ┌───────────────▼────────────────┐
-               │         RESIDUALS               │
-               │  (= Thực tế − Dự báo Prophet)  │
-               └───────────────┬────────────────┘
-                               │
-               ┌───────────────▼────────────────┐
-               │    Stage 2: LIGHTGBM GLOBAL     │
-               │   (Học từ Residuals + Features) │
-               │   → Bù trừ phần chưa dự báo    │
-               └───────────────┬────────────────┘
-                               │
-            ┌──────────────────▼───────────────────┐
-            │        Kết Quả Dự Báo Cuối Cùng      │
-            │  Final = Prophet_pred + LightGBM_pred │
-            └──────────────────────────────────────┘
-```
-
----
-
-*Tài liệu được tạo tự động — cập nhật lần cuối: 2026-04-30*
+- **Cấu hình**: Tuyệt đối không sửa các tham số (ngày lễ, tham số model) trong file `.py`. Hãy sửa trong `config/config.yaml`.
+- **Thêm tính năng**: Nếu muốn thêm đặc trưng mới, hãy sửa file `src/features/feature_engineering.py`.
+- **API**: Để kiểm tra API, hãy truy cập Swagger UI tại `/docs` sau khi bật server.
+- **Log**: Luôn kiểm tra `logs/pipeline.log` nếu thấy Pipeline dừng đột ngột.
