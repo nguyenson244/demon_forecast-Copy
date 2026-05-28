@@ -17,63 +17,93 @@ paths:
   logs:       logs
 
 # ── Cấu hình Phân cụm (Clustering) ────────────────────────
-# Cluster 0: Stable (Bán mạnh, đều)
-# Cluster 1: Regular/Snacks (Biến động vừa)
-# Cluster 2: Extreme Seasonal (Mùa vụ Trung Thu/Tết)
+# Cluster 0: Stable     — Bán mạnh, đều quanh năm
+# Cluster 1: Regular    — Biến động vừa, snacks thường ngày
+# Cluster 2: Seasonal   — Đỉnh cực Trung Thu / Tết
 cluster_mapping:
-  KINH DO BREAD: 0
-  KINH DO CAKE: 0
-  SOLITE: 0
-  COSY: 0
-  AFC: 1
-  OREO: 1
-  LU: 1
-  RITZ: 1
-  SLIDE: 1
+  KINH DO BREAD:   0
+  KINH DO CAKE:    0
+  SOLITE:          0
+  COSY:            0
+  AFC:             1
+  OREO:            1
+  LU:              1
+  RITZ:            1
+  SLIDE:           1
   KINH DO BISCUIT: 1
-  THU: 2
-  TRANG VANG: 2
-  HAMPER: 2
-  CADBURY: 2
-  KOKO: 2
+  THU:             2
+  TRANG VANG:      2
+  HAMPER:          2
+  CADBURY:         2
+  KOKO:            2
 
 # ── Cột quan trọng ─────────────────────────────────────────
 columns:
   date:     ACTUALSHIPDATE
   brand:    BRAND
   category: CATEGORY
-  target:   Total QTY
+  target:   "Total QTY"
 
 # ── Mốc Train/Test Split ───────────────────────────────────
 split_date: "2025-06-30"
 
+# ── Giá trị mặc định khi điền missing ─────────────────────
+defaults:
+  whseid: "BKD1"           # kho mặc định khi WHSEID bị NaN
+
 # ── Ngày lễ Việt Nam ───────────────────────────────────────
 holidays:
   tet:
-    2023: "2023-01-22"   # Quý Mão
-    2024: "2024-02-10"   # Giáp Thìn
-    2025: "2025-01-29"   # Ất Tỵ
-    2026: "2026-02-17"   # Bính Ngọ
+    2023: "2023-01-22"     # Quý Mão
+    2024: "2024-02-10"     # Giáp Thìn
+    2025: "2025-01-29"     # Ất Tỵ
+    2026: "2026-02-17"     # Bính Ngọ
   mid_autumn:
     2023: "2023-09-29"
     2024: "2024-09-17"
     2025: "2025-10-06"
 
 # ── Feature Engineering ────────────────────────────────────
+# Lưu ý lag_365: sẽ NaN trong năm đầu tiên của mỗi brand.
+# Đây là expected — LightGBM xử lý NaN nội bộ.
+# Nếu data < 2 năm: cân nhắc bỏ lag_365 để giảm NaN ratio.
 features:
-  lag_periods:        [1, 2, 3, 5, 7, 14, 21, 28, 30, 60, 90, 120, 150, 180, 365]
+  lag_periods:        [1, 2, 3, 5, 7, 14, 21, 28, 30, 60, 90, 120, 150, 180, 364, 365, 366]
   same_weekday_weeks: [1, 2, 3, 4]
   rolling_windows:    [7, 14, 30, 90]
   rolling_stats:      [mean, std, median, min, max]
 
+# ── Outlier Detection (IQR-based capping) ──────────────────
+outlier:
+  method:         iqr          # iqr | zscore
+  iqr_multiplier: 3.0          # 1.5=standard, 3.0=conservative (phù hợp FMCG có peak)
+  group_cols:     [BRAND, CATEGORY]
+
 # ── LightGBM ───────────────────────────────────────────────
 lightgbm:
-  device:          gpu      # gpu | cpu  (auto-fallback nếu không có GPU)
-  optuna_n_trials: 50
-  tscv_n_splits:   5
+  device:             cpu      # cpu | gpu (auto-fallback)
+  optuna_n_trials:    20       # số trials Optuna HPO per cluster (0 = skip)
+  tscv_n_splits:      5        # số folds walk-forward backtest
+  calibration_ratio:  0.25     # tỷ lệ train dùng cho OOS calibration (LightGBM target)
+
+  # Default hyperparameters (dùng khi optuna_n_trials = 0)
+  # Đã tuned cho FMCG demand forecasting với zero-inflation
+  params:
+    n_estimators:       500
+    learning_rate:      0.05
+    num_leaves:         63
+    max_depth:          -1
+    feature_fraction:   0.8
+    bagging_fraction:   0.8
+    bagging_freq:       5
+    min_child_samples:  20
+    lambda_l1:          0.1
+    lambda_l2:          0.1
+    verbosity:          -1
+    random_state:       42
 
 # ── API ────────────────────────────────────────────────────
 api:
-  host: 0.0.0.0
-  port: 8000
+  host:   0.0.0.0
+  port:   8000
   reload: false
