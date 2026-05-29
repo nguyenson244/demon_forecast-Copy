@@ -82,7 +82,53 @@ def report_data_quality(df: pd.DataFrame) -> None:
 
 
 # ═══════════════════════════════════════════════════════════
-# 3. FULL DATE GRID
+# 3. AGGREGATE THEO KHO
+# ═══════════════════════════════════════════════════════════
+def aggregate_by_brand(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Gộp dữ liệu từ nhiều kho (WHSEID) về cấp Brand × Category × Date.
+
+    Lý do cần bước này:
+      - Raw data có thể chứa nhiều dòng cho cùng Date + Brand + Category
+        nếu hàng hóa xuất từ nhiều kho khác nhau.
+      - Mô hình dự báo cần 1 giá trị duy nhất per (Date, Brand, Category).
+      - Total QTY và Total CBM được cộng tổng.
+      - WHSEID được giữ lại là kho xuất nhiều nhất (mode) cho mục đích logging.
+
+    Kết quả kiểm tra thực tế:
+      - Dữ liệu hiện tại chỉ có 1 kho (BKD1) → không thay đổi số dòng.
+      - Bước này đảm bảo pipeline đúng khi mở rộng thêm kho trong tương lai.
+    """
+    n_before = len(df)
+    whs_col = "WHSEID"
+
+    agg_dict = {TARGET_COL: "sum"}
+    if "Total CBM" in df.columns:
+        agg_dict["Total CBM"] = "sum"
+    if whs_col in df.columns:
+        agg_dict[whs_col] = lambda x: x.mode().iloc[0] if len(x) > 0 else CONF.default_whseid
+
+    group_cols = [DATE_COL, "BRAND", "CATEGORY"]
+    group_cols_present = [c for c in group_cols if c in df.columns]
+
+    df_agg = (
+        df.groupby(group_cols_present, as_index=False, observed=True)
+        .agg(agg_dict)
+    )
+
+    n_after = len(df_agg)
+    n_warehouses = df[whs_col].nunique() if whs_col in df.columns else 1
+
+    logger.info(
+        f"Aggregate: {n_warehouses} kho → "
+        f"{n_before:,} rows → {n_after:,} rows "
+        f"({'không thay đổi' if n_before == n_after else f'giảm {n_before - n_after:,} dòng trùng'})"
+    )
+    return df_agg
+
+
+# ═══════════════════════════════════════════════════════════
+# 4. FULL DATE GRID
 # ═══════════════════════════════════════════════════════════
 def create_full_grid(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -278,10 +324,13 @@ def clean(df: pd.DataFrame | None = None) -> pd.DataFrame:
     logger.info("[3/5] Data quality check...")
     report_data_quality(df)
 
+    logger.info("[3.5/5] Aggregate theo kho (WHSEID)...")
+    df = aggregate_by_brand(df)
+
     logger.info("[4/5] Creating full date grid (zero-inflation)...")
     df = create_full_grid(df)
 
-    logger.info("[5/5] Outlier detection & capping (IQR per group)...")
+    logger.info("[5/6] Outlier detection & capping (IQR per group)...")
     df = detect_and_handle_outliers(
         df,
         target_col=TARGET_COL,

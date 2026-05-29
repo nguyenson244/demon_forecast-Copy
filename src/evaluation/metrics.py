@@ -454,6 +454,103 @@ def plot_feature_importance(save_dir: str | None = None, top_n: int = 20) -> Non
 
 
 # ═══════════════════════════════════════════════════════════
+# ACF / PACF ANALYSIS
+# ═══════════════════════════════════════════════════════════
+def plot_acf_pacf(
+    train_df: pd.DataFrame,
+    save_dir: str | None = None,
+    n_lags: int = 60,
+) -> None:
+    """
+    Vẽ ACF và PACF cho 3 brand đại diện (1 per cluster).
+
+    - ACF  (Autocorrelation Function): tương quan giữa chuỗi và phiên bản
+      trễ của chính nó → cho thấy lag nào có liên hệ tuyến tính tổng thể.
+    - PACF (Partial ACF): tương quan trực tiếp ở lag k sau khi loại bỏ
+      ảnh hưởng của các lag trung gian → giúp xác định bậc AR.
+
+    Brand đại diện:
+      Cluster 0 (Stable)   → KINH DO BREAD
+      Cluster 1 (Regular)  → AFC
+      Cluster 2 (Seasonal) → THU
+    """
+    from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+    if save_dir is None:
+        save_dir = PATHS["figures"]
+
+    # Brand đại diện — 1 per cluster
+    rep_brands = {
+        "KINH DO BREAD": "Cluster 0 — Stable",
+        "AFC":           "Cluster 1 — Regular",
+        "THU":           "Cluster 2 — Seasonal",
+    }
+
+    fig, axes = plt.subplots(
+        nrows=len(rep_brands), ncols=2,
+        figsize=(16, 5 * len(rep_brands)),
+    )
+    fig.suptitle(
+        "ACF & PACF — Brand Đại Diện Theo Cụm\n"
+        "(Dữ liệu Train | Daily Total QTY)",
+        fontsize=15, fontweight="bold", y=1.01,
+    )
+
+    for row, (brand, label) in enumerate(rep_brands.items()):
+        series = (
+            train_df[train_df["BRAND"] == brand]
+            .groupby(DATE_COL)[TARGET_COL]
+            .sum()
+            .sort_index()
+            .asfreq("D", fill_value=0)
+        )
+
+        if len(series) < n_lags + 10:
+            logger.warning(f"ACF/PACF: {brand} không đủ dữ liệu ({len(series)} rows).")
+            continue
+
+        # ACF
+        plot_acf(
+            series, lags=n_lags, ax=axes[row, 0],
+            alpha=0.05, color="#2196F3", zero=False,
+        )
+        axes[row, 0].set_title(f"ACF — {brand}\n({label})", fontweight="bold")
+        axes[row, 0].set_xlabel("Lag (ngày)")
+        axes[row, 0].set_ylabel("Tương quan")
+        # Đánh dấu lag đặc biệt
+        for lag_mark in [7, 14, 30, 60]:
+            if lag_mark <= n_lags:
+                axes[row, 0].axvline(lag_mark, color="red", linestyle="--",
+                                     alpha=0.4, linewidth=0.8)
+
+        # PACF
+        plot_pacf(
+            series, lags=n_lags, ax=axes[row, 1],
+            alpha=0.05, color="#4CAF50", zero=False, method="ywm",
+        )
+        axes[row, 1].set_title(f"PACF — {brand}\n({label})", fontweight="bold")
+        axes[row, 1].set_xlabel("Lag (ngày)")
+        axes[row, 1].set_ylabel("Tương quan riêng phần")
+        for lag_mark in [7, 14, 30, 60]:
+            if lag_mark <= n_lags:
+                axes[row, 1].axvline(lag_mark, color="red", linestyle="--",
+                                     alpha=0.4, linewidth=0.8)
+
+    # Chú thích đường đỏ
+    fig.text(
+        0.5, -0.01,
+        "Đường đỏ đứt: lag 7, 14, 30, 60 ngày  |  Vùng xanh: khoảng tin cậy 95%",
+        ha="center", fontsize=10, color="gray",
+    )
+
+    plt.tight_layout()
+    path = os.path.join(save_dir, "acf_pacf_analysis.png")
+    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close()
+    logger.info(f"✓ ACF/PACF → {path}")
+
+
+# ═══════════════════════════════════════════════════════════
 # PUBLIC API
 # ═══════════════════════════════════════════════════════════
 def evaluate(
@@ -514,7 +611,7 @@ def evaluate(
     logger.info("[4/5] Residual diagnostics...")
     plot_residual_diagnostics(test_df)
 
-    logger.info("[5/5] Comparison bars, per-brand metrics & feature importance...")
+    logger.info("[5/6] Comparison bars, per-brand metrics & feature importance...")
     plot_comparison_bars(comparison_df)
     brand_df = per_brand_metrics(test_df)
     brand_df.to_csv(
@@ -522,6 +619,12 @@ def evaluate(
     )
     logger.info(f"\n{brand_df.to_string(index=False)}")
     plot_feature_importance()
+
+    logger.info("[6/6] ACF/PACF analysis (EDA bo sung)...")
+    if train_df is not None:
+        plot_acf_pacf(train_df)
+    else:
+        logger.warning("Khong co train_df → bo qua ACF/PACF.")
 
     logger.info("✓ HOÀN TẤT ĐÁNH GIÁ")
     return comparison_df, brand_df
