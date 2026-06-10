@@ -36,11 +36,12 @@ warnings.filterwarnings("ignore")
 
 from src.utils.logger import get_logger
 from src.utils.config_loader import (
-    PATHS, DATE_COL, TARGET_COL,
+    PATHS, DATE_COL, TARGET_COL, CONF,
     TET_DATES, MID_AUTUMN_DATES, SPLIT_DATE,
     LAG_PERIODS, SAME_WEEKDAY_WEEKS, ROLLING_WINDOWS,
     ensure_dirs,
 )
+from src.data.data_cleaning import detect_and_handle_outliers
 
 logger = get_logger(__name__)
 
@@ -497,6 +498,16 @@ def engineer(
         logger.info(f"Loaded cleaned data: {len(cleaned_df):,} rows")
 
     df = cleaned_df.sort_values(["BRAND", "CATEGORY", DATE_COL]).reset_index(drop=True)
+
+    logger.info("[0/11] Outlier capping (fit on train only — no leakage)...")
+    train_only = df[df[DATE_COL] <= SPLIT_DATE]
+    df = detect_and_handle_outliers(
+        df,
+        target_col=TARGET_COL,
+        group_cols=CONF.outlier_group_cols,
+        iqr_multiplier=CONF.outlier_iqr_multiplier,
+        fit_df=train_only,
+    )
 
     logger.info("[1/11] Time features...")
     df = create_time_features(df)

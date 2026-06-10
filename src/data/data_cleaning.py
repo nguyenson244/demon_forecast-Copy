@@ -189,6 +189,7 @@ def detect_and_handle_outliers(
     method: str | None = None,
     group_cols: list[str] | None = None,
     iqr_multiplier: float | None = None,
+    fit_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Phát hiện và CAP outliers bằng IQR per group.
@@ -196,6 +197,10 @@ def detect_and_handle_outliers(
     Logic:
       upper_bound = Q3 + k * IQR
       lower_bound = max(0, Q1 - k * IQR)  ← không clip âm cho QTY
+
+    fit_df : DataFrame | None
+        Nếu cung cấp, tính IQR bounds từ fit_df (thường là train set)
+        rồi apply sang df. Nếu None, tính trực tiếp từ df.
 
     Tại sao k=3.0 thay vì 1.5:
       - FMCG có peak mùa vụ Trung Thu/Tết — peak thật sự cao gấp 10x thường ngày
@@ -224,31 +229,37 @@ def detect_and_handle_outliers(
         iqr_multiplier = CONF.outlier_iqr_multiplier
 
     df = df.copy()
+    # Dùng fit_df để tính bounds nếu có (tránh leakage), ngược lại dùng chính df
+    source = fit_df if fit_df is not None else df
     total_capped = 0
 
     valid_group_cols = [c for c in group_cols if c in df.columns]
 
     if valid_group_cols:
-        for keys, group in df.groupby(valid_group_cols, observed=True):
-            idx = group.index
+        # Tính bounds từ source (train), apply lên df (full)
+        bounds: dict = {}
+        for keys, group in source.groupby(valid_group_cols, observed=True):
             vals = group[target_col]
             q1, q3 = vals.quantile(0.25), vals.quantile(0.75)
             iqr = q3 - q1
-            lower = max(0.0, q1 - iqr_multiplier * iqr)
-            upper = q3 + iqr_multiplier * iqr
+            bounds[keys] = (max(0.0, q1 - iqr_multiplier * iqr), q3 + iqr_multiplier * iqr)
 
-            before = vals.copy()
-            df.loc[idx, target_col] = vals.clip(lower=lower, upper=upper)
-            n_capped = int((df.loc[idx, target_col] != before).sum())
-            total_capped += n_capped
+        for keys, group in df.groupby(valid_group_cols, observed=True):
+            if keys not in bounds:
+                continue
+            lower, upper = bounds[keys]
+            idx = group.index
+            before = df.loc[idx, target_col].copy()
+            df.loc[idx, target_col] = df.loc[idx, target_col].clip(lower=lower, upper=upper)
+            total_capped += int((df.loc[idx, target_col] != before).sum())
     else:
-        vals = df[target_col]
-        q1, q3 = vals.quantile(0.25), vals.quantile(0.75)
+        vals_source = source[target_col]
+        q1, q3 = vals_source.quantile(0.25), vals_source.quantile(0.75)
         iqr = q3 - q1
         lower = max(0.0, q1 - iqr_multiplier * iqr)
         upper = q3 + iqr_multiplier * iqr
-        before = vals.copy()
-        df[target_col] = vals.clip(lower=lower, upper=upper)
+        before = df[target_col].copy()
+        df[target_col] = df[target_col].clip(lower=lower, upper=upper)
         total_capped = int((df[target_col] != before).sum())
 
     pct_capped = total_capped / len(df) * 100
@@ -329,14 +340,6 @@ def clean(df: pd.DataFrame | None = None) -> pd.DataFrame:
 
     logger.info("[4/5] Creating full date grid (zero-inflation)...")
     df = create_full_grid(df)
-
-    logger.info("[5/6] Outlier detection & capping (IQR per group)...")
-    df = detect_and_handle_outliers(
-        df,
-        target_col=TARGET_COL,
-        group_cols=CONF.outlier_group_cols,
-        iqr_multiplier=CONF.outlier_iqr_multiplier,
-    )
 
     out_path = os.path.join(PATHS["processed"], "cleaned_data.csv")
     df.to_csv(out_path, index=False)

@@ -7,8 +7,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Dữ liệu (raw giữ nguyên ignore vì có thể chứa dữ liệu nhạy cảm)
-# data/processed/ và data/features/ đã được include để share kết quả
+# Dữ liệu — không upload dữ liệu nội bộ lên public repo
+data/processed/
+data/features/
 
 # Model binary (Nặng, không nên upload)
 models/*.pkl
@@ -19,8 +20,9 @@ results/figures/*.png
 results/metrics/*.csv
 
 # Logs
-logs/*.log
+logs/
 *.log
+*.log.*
 
 # Môi trường ảo
 venv/

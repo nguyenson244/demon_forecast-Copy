@@ -1,0 +1,92 @@
+{
+  "AFC": {
+    "alpha": 0.0,
+    "factor": 1.0524251201356127,
+    "is_fallback": true,
+    "cluster": 1
+  },
+  "CADBURY": {
+    "alpha": 0.0,
+    "factor": 1.0,
+    "is_fallback": true,
+    "cluster": 2
+  },
+  "COSY": {
+    "alpha": 0.0,
+    "factor": 0.9575436137131255,
+    "is_fallback": false,
+    "cluster": 0
+  },
+  "HAMPER": {
+    "alpha": 0.0,
+    "factor": 0.9548931954654697,
+    "is_fallback": false,
+    "cluster": 2
+  },
+  "KINH DO BISCUIT": {
+    "alpha": 0.0,
+    "factor": 0.9761492829599104,
+    "is_fallback": false,
+    "cluster": 1
+  },
+  "KINH DO BREAD": {
+    "alpha": 0.0,
+    "factor": 1.0452376455070285,
+    "is_fallback": false,
+    "cluster": 0
+  },
+  "KINH DO CAKE": {
+    "alpha": 0.0,
+    "factor": 0.989714345520332,
+    "is_fallback": true,
+    "cluster": 0
+  },
+  "KOKO": {
+    "alpha": 0.0,
+    "factor": 1.0,
+    "is_fallback": true,
+    "cluster": 2
+  },
+  "LU": {
+    "alpha": 0.30000000000000004,
+    "factor": 0.8928098297738475,
+    "is_fallback": false,
+    "cluster": 1
+  },
+  "OREO": {
+    "alpha": 0.2,
+    "factor": 0.9818692876326945,
+    "is_fallback": false,
+    "cluster": 1
+  },
+  "RITZ": {
+    "alpha": 0.6000000000000001,
+    "factor": 0.9573305057161674,
+    "is_fallback": false,
+    "cluster": 1
+  },
+  "SLIDE": {
+    "alpha": 0.1,
+    "factor": 0.9674090704043029,
+    "is_fallback": false,
+    "cluster": 1
+  },
+  "SOLITE": {
+    "alpha": 0.0,
+    "factor": 0.9656559795308096,
+    "is_fallback": false,
+    "cluster": 0
+  },
+  "THU": {
+    "alpha": 0.0,
+    "factor": 1.199201209304457,
+    "is_fallback": false,
+    "cluster": 2
+  },
+  "TRANG VANG": {
+    "alpha": 0.0,
+    "factor": 1.0,
+    "is_fallback": true,
+    "cluster": 2
+  }
+}
